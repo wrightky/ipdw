@@ -12,7 +12,7 @@ class Gridded():
         Initialize a raster object
         extent is [xmin, xmax, ymin, ymax]
         """
-        self.extent = [float(x) for x in in extent]
+        self.extent = [float(x) for x in extent]
         self.cellsize = float(cellsize)
         self.boundary = boundary
         self.holes = holes
@@ -33,11 +33,11 @@ class Gridded():
         
         # Filter out points outside of domain boundary
         path = matplotlib.path.Path(self.boundary)
-        self.raster = path.contains_points(gridXY_array)
+        self.raster = path.contains_points(gridXY_array).astype(int)
         
         # Filter out points inside any interal holes
         if getattr(self,'holes',None) is not None:
-            for hole in holes:
+            for hole in self.holes:
                 path = matplotlib.path.Path(hole)
                 self.raster[path.contains_points(gridXY_array)] = 0
         
@@ -57,8 +57,8 @@ class Gridded():
         
         self.dist_from_each = np.ones((self.raster.shape[0], self.raster.shape[1], len(input_values)))*np.nan
         for n in range(len(input_values)):
-            x = input_locations[0,n]
-            y = input_locations[1,n]
+            x = input_locations[n,0]
+            y = input_locations[n,1]
             
             iy = int(self.raster.shape[0] - round((y - self.extent[2])/self.cellsize))
             ix = int(round((x - self.extent[0])/self.cellsize))
@@ -70,7 +70,10 @@ class Gridded():
                 phi[iy-buffer:iy+buffer,ix-buffer:ix+buffer] = 1
             else:
                 phi[iy,ix] = 1
-            dist = np.abs(skfmm.distance(phi)*self.cellsize) + offsets
+            try:
+                dist = np.abs(skfmm.distance(phi)*self.cellsize) + offsets[n]
+            except ValueError:
+                raise ValueError("One or more locations are not within the enclosed boundary. Check locations or try increasing the buffer size")
             dist[mask] = np.nan
             self.dist_from_each[:,:,n] = dist
 
@@ -87,9 +90,10 @@ class Gridded():
             denominator += 1/di
 
         self.output = numerator/denominator
+        self.output[self.raster==0] = np.nan
         return self.output
 
-    def reinterpolate(input_values):
+    def reinterpolate(self, input_values):
         """
         If self.interpolate has already been run, this function allows you to
         interpolate again from the same locations using new values. Reduces the
@@ -106,4 +110,5 @@ class Gridded():
             denominator += 1/di
 
         self.output = numerator/denominator
+        self.output[self.raster==0] = np.nan
         return self.output
