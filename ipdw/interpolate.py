@@ -96,7 +96,7 @@ class Gridded():
             xvect[0]-0.5*self.cellsize,
             xvect[-1]+0.5*self.cellsize,
             yvect[0]-0.5*self.cellsize,
-            yvect[-1]-0.5*self.cellsize,
+            yvect[-1]+0.5*self.cellsize,
         ]
         return
     
@@ -187,7 +187,7 @@ class Gridded():
             self.dist_from_each[:,:,n] = dist # Store result
 
         # For each cell, find indices of N nearest input locations
-        self.arg_n_min = np.argsort(dist_from_each)[:,:,:n_nearest]
+        self.arg_n_min = np.argsort(self.dist_from_each)[:,:,:n_nearest]
 
         # Perform inverse-path-distance-weighted interpolation
         # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
@@ -197,7 +197,7 @@ class Gridded():
         for i in range(self.n_nearest):
             # Grab values at i'th nearest location
             vi = np.array([input_values[n] for n in self.arg_n_min[:,:,i]])
-            v1.shape = self.raster.shape
+            vi.shape = self.raster.shape
             # Grab distance at i'th nearest location
             di = np.take_along_axis(self.dist_from_each,
                                     self.arg_n_min, axis=-1)[:,:,i]
@@ -231,7 +231,7 @@ class Gridded():
         for i in range(self.n_nearest):
             # Grab values at i'th nearest location
             vi = np.array([input_values[n] for n in self.arg_n_min[:,:,i]])
-            v1.shape = self.raster.shape
+            vi.shape = self.raster.shape
             # Grab distance at i'th nearest location
             di = np.take_along_axis(self.dist_from_each,
                                     self.arg_n_min, axis=-1)[:,:,i]
