@@ -191,7 +191,8 @@ class Gridded():
             vi = np.array([input_values[n] for n in self.arg_n_min[:,:,i]])
             v1.shape = self.raster.shape
             # Grab distance at i'th nearest location
-            di = np.take_along_axis(self.dist_from_each, self.arg_n_min, axis=-1)[:,:,i]
+            di = np.take_along_axis(self.dist_from_each,
+                                    self.arg_n_min, axis=-1)[:,:,i]
             
             # Add to running tallies
             numerator += vi/di
@@ -205,19 +206,33 @@ class Gridded():
     def reinterpolate(self, input_values):
         """
         If self.interpolate has already been run, this function allows you to
-        interpolate again from the same locations using new values. Reduces the
-        computational cost compared to rebuilding the interpolation again from scratch.
+        interpolate again from the same locations using new values. Reduces
+        the computational cost of rebuilding the interpolation from scratch.
+        Aside from input_values, all other inputs must be the same.
+
+        **Inputs**
+            input_values (list or array) : Data values at each input location.
+        **Outputs**
+            output (array) : Raster of interpolated values.
         """
-        numerator = np.zeros_like(self.raster, dtype=float)
-        denominator = np.zeros_like(self.raster, dtype=float)
+        # Perform inverse-path-distance-weighted interpolation
+        # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
+        numerator = np.zeros_like(self.raster, dtype=float) # init
+        denominator = np.zeros_like(self.raster, dtype=float) # init
+        # Loop through nearest locations
         for i in range(self.n_nearest):
+            # Grab values at i'th nearest location
             vi = np.array([input_values[n] for n in self.arg_n_min[:,:,i]])
             v1.shape = self.raster.shape
-            di = np.take_along_axis(self.dist_from_each, self.arg_n_min, axis=-1)[:,:,i]
+            # Grab distance at i'th nearest location
+            di = np.take_along_axis(self.dist_from_each,
+                                    self.arg_n_min, axis=-1)[:,:,i]
             
+            # Add to running tallies
             numerator += vi/di
             denominator += 1/di
 
+        # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[self.raster==0] = np.nan
+        self.output[self.raster==0] = np.nan # Mask to domain
         return self.output
