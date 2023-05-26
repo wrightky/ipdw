@@ -49,28 +49,45 @@ class Gridded():
     
     def _build_raster(self):
         """
-        Helper function creates a target raster taking into account domain topology
+        Helper function creates a target raster taking into account domain
+        topology. Function is called during Gridded object initialization.
+        
+        In order to build the target raster, this function relies heavily on
+        matplotlib.path.Path() to make use of the domain boundary and hole
+        information. The speed of this function is therefore primarily limited
+        by the computational time needed to build each Path object and query
+        each raster point.
+        
+        **Inputs**
+            None, but relies on attributes supplied during instantiation.
+        **Outputs**
+            After running, the Gridded.raster attribute will contain a binary
+            basemap for later interpolation, with 1's everywhere inside the
+            domain, and 0's elsewhere.
         """
-        # Get some dimensions and make x,y grid
+        # Construct the target x,y grid using the domain extent and cellsize
         nx = int(np.ceil((self.extent[1]-self.extent[0])/self.cellsize)+1)
-        xvect = np.linspace(self.extent[0], self.extent[0]+self.cellsize*(nx-1), nx)
+        xvect = np.linspace(self.extent[0],
+                            self.extent[0]+self.cellsize*(nx-1), nx)
         ny = int(np.ceil((self.extent[3]-self.extent[2])/self.cellsize)+1)
-        yvect = np.linspace(self.extent[2], self.extent[2]+self.cellsize*(ny-1), ny)
+        yvect = np.linspace(self.extent[2],
+                            self.extent[2]+self.cellsize*(ny-1), ny)
         gridX, gridY = np.meshgrid(xvect, yvect)
         gridXY_array = np.array([np.concatenate(gridX),
                                  np.concatenate(gridY)]).transpose()
+        # gridXY_array contains all raster cell coordinates
         
         # Filter out points outside of domain boundary
-        path = matplotlib.path.Path(self.boundary)
+        path = matplotlib.path.Path(self.boundary) # Build path
         self.raster = path.contains_points(gridXY_array).astype(int)
         
         # Filter out points inside any interal holes
-        if getattr(self,'holes',None) is not None:
+        if self.holes is not None:
             for hole in self.holes:
                 path = matplotlib.path.Path(hole)
                 self.raster[path.contains_points(gridXY_array)] = 0
         
-        # Reshape
+        # Reshape to actual raster dimensions
         self.raster.shape = (len(yvect), len(xvect))
         self.raster = np.flipud(self.raster)
         return
