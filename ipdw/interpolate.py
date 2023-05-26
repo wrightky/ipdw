@@ -92,23 +92,75 @@ class Gridded():
         self.raster = np.flipud(self.raster)
         return
     
-    def interpolate(self, input_locations, input_values, n_nearest=3, offsets=None, buffer=1):
+    def interpolate(self, input_locations, input_values, n_nearest=3,
+                    offsets=None, buffer=0):
         """
-        Method performs interpolation from discete data points onto target raster
-        """
-        self.n_nearest = n_nearest
+        Method performs inverse-path-distance-weighted interpolation from
+        input data locations onto target raster, using the number of neighbor
+        points specified in the function call.
         
+        This function relies heavily on scikit-fmm to compute geodesic
+        distances within the domain topology. The speed of this function is
+        therefore primarily limited by the computational time needed to compute
+        each distance raster. Also, as an intermediate step of this process,
+        each distance raster will be stored in an array of shape
+        (y_dimension_length, x_dimension_length, len(input_locations)), so be
+        wary of memory limits if cellsize is small or if a large number of
+        input points are provided.
+        
+        **Inputs**
+            input_locations (list or array) : Coordinates of the input data
+                in the same length-scale units used to define domain boundary.
+                Coordinates should be specified as [[x1,y1],[x2,y2],...] pairs
+                in either a list or array. Array dimensions should be (N,2).
+            input_values (list or array) : Data values at each input location.
+            n_nearest (int, default=3) : Number of nearest input locations to
+                use in the interpolation weighting. An input of "1" will return
+                nearest-neighbor interpolation; larger values will return 
+                "smoother" outputs.
+            offsets (list or array, optional) : Optional constant values by
+                which to increase the "zero" distance at each input
+                location. Using values >0 at some location will decrease the
+                weight of that location during interpolation. Can be used
+                to reduce the weight of less certain inputs, or allow data
+                locations from outside the enclosed boundary to be moved
+                inside the boundary while maintaining the true distance.
+            buffer (int, default=0) : Optional number of neighbor cells around
+                each input location which is considered "zero" distance.
+                Function requires all input locations to be "inside" the
+                enclosed domain (or it will return a ValueError), so
+                increasing the buffer by a few cells can be helpful if any
+                inputs are very close to a boundary/hole. Applied uniformly to
+                all locations, so does not affect weighting. 
+        **Outputs**
+            output (array) : Raster of interpolated values.
+        """
+        # Do some type checks on input values
+        self.n_nearest = int(n_nearest)
+        if type(input_locations) == list:
+            input_locations = np.array(input_locations) # Convert to array
+        if type(input_values) == list:
+            input_values = np.array(input_values) # Convert to array
         if offsets is None:
             offsets = np.zeros_like(input_values)
+        else:
+            if type(offsets) == list:
+                offsets = np.array(offsets)
         
-        self.dist_from_each = np.ones((self.raster.shape[0], self.raster.shape[1], len(input_values)))*np.nan
+        # Initialize distance raster
+        self.dist_from_each = np.ones((self.raster.shape[0],
+                                       self.raster.shape[1],
+                                       len(input_values)))*np.nan
+        # Loop through input locations and compute distance raster for each
         for n in range(len(input_values)):
             x = input_locations[n,0]
             y = input_locations[n,1]
             
-            iy = int(self.raster.shape[0] - round((y - self.extent[2])/self.cellsize))
+            # Convert from real x,y to raster indices ix,iy
+            iy = int(self.raster.shape[0]-round((y-self.extent[2])/self.cellsize))
             ix = int(round((x - self.extent[0])/self.cellsize))
             
+            # Perform fast marching
             phi = -1*self.raster
             mask = self.raster==0
             phi = np.ma.MaskedArray(phi, mask)
@@ -117,26 +169,37 @@ class Gridded():
             else:
                 phi[iy,ix] = 1
             try:
+                # Actually compute distances
                 dist = np.abs(skfmm.distance(phi)*self.cellsize) + offsets[n]
             except ValueError:
-                raise ValueError("One or more locations are not within the enclosed boundary. Check locations or try increasing the buffer size")
-            dist[mask] = np.nan
-            self.dist_from_each[:,:,n] = dist
+                raise ValueError("One or more locations are not within the "+\
+                                 "enclosed boundary. Check locations or try "+\
+                                 "increasing the buffer size")
+            dist[mask] = np.nan # Mask out locations outside domain
+            self.dist_from_each[:,:,n] = dist # Store result
 
+        # For each cell, find indices of N nearest input locations
         self.arg_n_min = np.argsort(dist_from_each)[:,:,:n_nearest]
 
-        numerator = np.zeros_like(self.raster, dtype=float)
-        denominator = np.zeros_like(self.raster, dtype=float)
+        # Perform inverse-path-distance-weighted interpolation
+        # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
+        numerator = np.zeros_like(self.raster, dtype=float) # init
+        denominator = np.zeros_like(self.raster, dtype=float) # init
+        # Loop through nearest locations
         for i in range(self.n_nearest):
+            # Grab values at i'th nearest location
             vi = np.array([input_values[n] for n in self.arg_n_min[:,:,i]])
             v1.shape = self.raster.shape
+            # Grab distance at i'th nearest location
             di = np.take_along_axis(self.dist_from_each, self.arg_n_min, axis=-1)[:,:,i]
             
+            # Add to running tallies
             numerator += vi/di
             denominator += 1/di
 
+        # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[self.raster==0] = np.nan
+        self.output[self.raster==0] = np.nan # Mask to domain
         return self.output
 
     def reinterpolate(self, input_values):
