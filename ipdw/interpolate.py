@@ -7,15 +7,44 @@ class Gridded():
     """
     Class for handling interpolation workflow
     """
-    def __init__(self, extent, cellsize, boundary, holes=None):
+    def __init__(self, cellsize, boundary, holes=None):
         """
-        Initialize a raster object
-        extent is [xmin, xmax, ymin, ymax]
+        Instantiate a gridded object. This will read the target cellsize,
+        domain boundary, and any internal holes in the domain, and create
+        a target raster used as a basemap for later interpolation. The
+        basemap is stored in the Gridded.raster attribute.
+        
+        **Inputs**
+            cellsize (int or float) : Cellsize of target raster. Smaller
+                values will result in a higher-resolution grid and require
+                more computational time
+            boundary (list or array) : Coordinates of the domain boundary
+                in the same length-scale units as "cellsize". Coordinates
+                should be specified as [[x1,y1],[x2,y2],...] pairs in either
+                a list or array. Array dimensions should be (N,2).
+            holes (list of lists or arrays) : Coordinates of internal "holes"
+                in the domain, specified as a list of holes. Each hole should
+                be specified in the same format as the "boundary" input (i.e.
+                either a list or array of x,y coordinates).
+        **Outputs**
+            After initialization, the Gridded.raster attribute will contain a
+            binary basemap for later interpolation, with 1's everywhere inside
+            the domain, and 0's elsewhere.
         """
-        self.extent = [float(x) for x in extent]
+        # Store inputs as attributes for accessibility
         self.cellsize = float(cellsize)
+        if type(boundary) == list:
+            boundary = np.array(boundary) # Convert to array if necessary
         self.boundary = boundary
+        # For convenience, store extent as [xmin, xmax, ymin, ymax]
+        self.extent = [min(boundary[:,0]), max(boundary[:,0]),
+                       min(boundary[:,1]), max(boundary[:,1])]
+        if holes is not None:
+            # Convert holes to arrays if necessary
+            if type(holes[0]) == list:
+                holes = [np.array(hole) for hole in holes]
         self.holes = holes
+        # Call _build_raster function to build basemap:
         self._build_raster()
     
     def _build_raster(self):
