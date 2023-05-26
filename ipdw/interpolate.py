@@ -36,9 +36,9 @@ class Gridded():
         if type(boundary) == list:
             boundary = np.array(boundary) # Convert to array if necessary
         self.boundary = boundary
-        # For convenience, store extent as [xmin, xmax, ymin, ymax]
-        self.extent = [min(boundary[:,0]), max(boundary[:,0]),
-                       min(boundary[:,1]), max(boundary[:,1])]
+        # For convenience, store bbox as [xmin, xmax, ymin, ymax]
+        self.bbox = [min(boundary[:,0]), max(boundary[:,0]),
+                     min(boundary[:,1]), max(boundary[:,1])]
         if holes is not None:
             # Convert holes to arrays if necessary
             if type(holes[0]) == list:
@@ -65,13 +65,13 @@ class Gridded():
             basemap for later interpolation, with 1's everywhere inside the
             domain, and 0's elsewhere.
         """
-        # Construct the target x,y grid using the domain extent and cellsize
-        nx = int(np.ceil((self.extent[1]-self.extent[0])/self.cellsize)+1)
-        xvect = np.linspace(self.extent[0],
-                            self.extent[0]+self.cellsize*(nx-1), nx)
-        ny = int(np.ceil((self.extent[3]-self.extent[2])/self.cellsize)+1)
-        yvect = np.linspace(self.extent[2],
-                            self.extent[2]+self.cellsize*(ny-1), ny)
+        # Construct the target x,y grid using the domain bbox and cellsize
+        nx = int(np.ceil((self.bbox[1]-self.bbox[0])/self.cellsize)+1)
+        xvect = np.linspace(self.bbox[0],
+                            self.bbox[0]+self.cellsize*(nx-1), nx)
+        ny = int(np.ceil((self.bbox[3]-self.bbox[2])/self.cellsize)+1)
+        yvect = np.linspace(self.bbox[2],
+                            self.bbox[2]+self.cellsize*(ny-1), ny)
         gridX, gridY = np.meshgrid(xvect, yvect)
         gridXY_array = np.array([np.concatenate(gridX),
                                  np.concatenate(gridY)]).transpose()
@@ -90,6 +90,14 @@ class Gridded():
         # Reshape to actual raster dimensions
         self.raster.shape = (len(yvect), len(xvect))
         self.raster = np.flipud(self.raster)
+        
+        # Also save actual raster extent, slightly larger than bbox
+        self.extent = [
+            xvect[0]-0.5*self.cellsize,
+            xvect[-1]+0.5*self.cellsize,
+            yvect[0]-0.5*self.cellsize,
+            yvect[-1]-0.5*self.cellsize,
+        ]
         return
     
     def interpolate(self, input_locations, input_values, n_nearest=3,
@@ -157,8 +165,8 @@ class Gridded():
             y = input_locations[n,1]
             
             # Convert from real x,y to raster indices ix,iy
-            iy = int(self.raster.shape[0]-round((y-self.extent[2])/self.cellsize))
-            ix = int(round((x - self.extent[0])/self.cellsize))
+            iy = int(self.raster.shape[0]-round((y-self.bbox[2])/self.cellsize))
+            ix = int(round((x - self.bbox[0])/self.cellsize))
             
             # Perform fast marching
             phi = -1*self.raster
