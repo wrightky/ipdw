@@ -223,6 +223,9 @@ class Gridded():
         **Outputs**
             output (array) : Raster of interpolated values.
         """
+        if type(input_values) == list:
+            input_values = np.array(input_values) # Convert to array
+
         # Perform inverse-path-distance-weighted interpolation
         # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
         numerator = np.zeros_like(self.raster, dtype=float) # init
