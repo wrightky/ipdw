@@ -157,11 +157,10 @@ class Gridded():
         if type(input_values) == list:
             input_values = np.array(input_values) # Convert to array
         if offsets is None:
-            offsets = np.zeros_like(input_values) + regularization
+            offsets = np.zeros_like(input_values)
         else:
             if type(offsets) == list:
                 offsets = np.array(offsets)
-            offsets += regularization
         
         # Initialize distance raster
         self.dist_from_each = np.ones((self.raster.shape[0],
@@ -212,11 +211,11 @@ class Gridded():
             
             # Add to running tallies
             if self.power == 1:
-                numerator += vi/di
-                denominator += 1/di
+                numerator += vi/(di + regularization)
+                denominator += 1/(di + regularization)
             else:
-                numerator += vi/(di**self.power)
-                denominator += 1/(di**self.power)
+                numerator += vi/(di**self.power + regularization)
+                denominator += 1/(di**self.power + regularization)
 
         # Divide to finish interpolation
         self.output = numerator/denominator
@@ -253,11 +252,11 @@ class Gridded():
             
             # Add to running tallies
             if self.power == 1:
-                numerator += vi/di
-                denominator += 1/di
+                numerator += vi/(di + self.regularization)
+                denominator += 1/(di + self.regularization)
             else:
-                numerator += vi/(di**self.power)
-                denominator += 1/(di**self.power)
+                numerator += vi/(di**self.power + self.regularization)
+                denominator += 1/(di**self.power + self.regularization)
 
         # Divide to finish interpolation
         self.output = numerator/denominator
