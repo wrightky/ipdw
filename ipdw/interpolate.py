@@ -219,7 +219,7 @@ class Gridded():
 
         # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[np.abs(self.raster)<self.regularization] = np.nan # Mask
+        self.output[self.raster==0] = np.nan # Mask
         return self.output
 
     def reinterpolate(self, input_values):
@@ -260,5 +260,5 @@ class Gridded():
 
         # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[np.abs(self.raster)<self.regularization] = np.nan # Mask
+        self.output[self.raster==0] = np.nan # Mask
         return self.output
