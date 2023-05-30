@@ -36,7 +36,7 @@ input_values2 = [7,3]
 
 def test_nearest():
     output = grid2.interpolate(input_locations2, input_values2, n_nearest=1)
-    assert output[2,55] == 3
+    assert output[2,55] - 3 < 1e-8
 
 def test_region():
     output = grid2.interpolate(input_locations2, input_values2, n_nearest=1)

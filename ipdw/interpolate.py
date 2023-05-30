@@ -101,7 +101,7 @@ class Gridded():
         return
     
     def interpolate(self, input_locations, input_values, n_nearest=3,
-                    offsets=None, buffer=0):
+                    power=1, offsets=None, buffer=0, regularization=1e-8):
         """
         Method performs inverse-path-distance-weighted interpolation from
         input data locations onto target raster, using the number of neighbor
@@ -126,6 +126,8 @@ class Gridded():
                 use in the interpolation weighting. An input of "1" will return
                 nearest-neighbor interpolation; larger values will return 
                 "smoother" outputs.
+            power (float, default=1) : Exponent on the distance parameter used
+                when computing weights, i.e. each weight = (1/d^power)
             offsets (list or array, optional) : Optional constant values by
                 which to increase the "zero" distance at each input
                 location. Using values >0 at some location will decrease the
@@ -139,21 +141,27 @@ class Gridded():
                 enclosed domain (or it will return a ValueError), so
                 increasing the buffer by a few cells can be helpful if any
                 inputs are very close to a boundary/hole. Applied uniformly to
-                all locations, so does not affect weighting. 
+                all locations, so does not affect weighting.
+            regularization (float, default=1e-8) : Very small regularization
+                parameter used to avoid dividing by zero when computing
+                the inverse of distance.
         **Outputs**
             output (array) : Raster of interpolated values.
         """
         # Do some type checks on input values
         self.n_nearest = int(n_nearest)
+        self.power = float(power)
+        self.regularization = regularization
         if type(input_locations) == list:
             input_locations = np.array(input_locations) # Convert to array
         if type(input_values) == list:
             input_values = np.array(input_values) # Convert to array
         if offsets is None:
-            offsets = np.zeros_like(input_values)
+            offsets = np.zeros_like(input_values) + regularization
         else:
             if type(offsets) == list:
                 offsets = np.array(offsets)
+            offsets += regularization
         
         # Initialize distance raster
         self.dist_from_each = np.ones((self.raster.shape[0],
@@ -190,7 +198,7 @@ class Gridded():
         self.arg_n_min = np.argsort(self.dist_from_each)[:,:,:n_nearest]
 
         # Perform inverse-path-distance-weighted interpolation
-        # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
+        # IDW formula is sum_i(v_i/d_i^P)/sum_i(1/d_i^P) for i=[1,N]
         numerator = np.zeros_like(self.raster, dtype=float) # init
         denominator = np.zeros_like(self.raster, dtype=float) # init
         # Loop through nearest locations
@@ -203,12 +211,16 @@ class Gridded():
                                     self.arg_n_min, axis=-1)[:,:,i]
             
             # Add to running tallies
-            numerator += vi/di
-            denominator += 1/di
+            if self.power == 1:
+                numerator += vi/di
+                denominator += 1/di
+            else:
+                numerator += vi/(di**self.power)
+                denominator += 1/(di**self.power)
 
         # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[self.raster==0] = np.nan # Mask to domain
+        self.output[np.abs(self.raster)<self.regularization] = np.nan # Mask
         return self.output
 
     def reinterpolate(self, input_values):
@@ -227,7 +239,7 @@ class Gridded():
             input_values = np.array(input_values) # Convert to array
 
         # Perform inverse-path-distance-weighted interpolation
-        # IDW formula is sum_i(v_i/d_i)/sum_i(1/d_i) for i=[1,N]
+        # IDW formula is sum_i(v_i/d_i^P)/sum_i(1/d_i^P) for i=[1,N]
         numerator = np.zeros_like(self.raster, dtype=float) # init
         denominator = np.zeros_like(self.raster, dtype=float) # init
         # Loop through nearest locations
@@ -240,10 +252,14 @@ class Gridded():
                                     self.arg_n_min, axis=-1)[:,:,i]
             
             # Add to running tallies
-            numerator += vi/di
-            denominator += 1/di
+            if self.power == 1:
+                numerator += vi/di
+                denominator += 1/di
+            else:
+                numerator += vi/(di**self.power)
+                denominator += 1/(di**self.power)
 
         # Divide to finish interpolation
         self.output = numerator/denominator
-        self.output[self.raster==0] = np.nan # Mask to domain
+        self.output[np.abs(self.raster)<self.regularization] = np.nan # Mask
         return self.output
