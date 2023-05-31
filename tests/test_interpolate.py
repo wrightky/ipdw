@@ -27,7 +27,7 @@ def test_area():
     area_fraction_inside = np.sum(grid1.raster)/grid1.raster.size
     assert area_fraction_inside == pytest.approx(0.528344, rel=0.01)
 
-# Test domain B
+# Test domain 2
 cellsize2 = 1
 boundary2 = [[0,0],[100,0],[100,100],[0,100],[0,52],[70,80],[70,20],[0,48]]
 grid2 = ipdw.Gridded(cellsize2, boundary2)
@@ -59,3 +59,20 @@ def test_reinterpolate():
     output_2 = grid2.reinterpolate([6,2])
     diff = output_1 - output_2
     assert np.nanmean(diff) == pytest.approx(1, rel=0.01)
+
+# Test domain 3
+extent = [0, 150, 0, 75]
+raster = np.array([[0,0,0,0,0,0],
+                   [0,1,1,0,1,0],
+                   [0,1,1,1,1,0]]).astype(float)
+grid3 = ipdw.Gridded(raster=raster, extent=extent)
+
+def test_from_raster():
+    assert (grid3.raster == raster).all()
+
+def test_cellsize():
+    assert grid3.cellsize == pytest.approx(25, rel=1e-6)
+
+def test_bbox():
+    bbox = np.round(np.array(grid3.bbox),1)
+    assert (bbox == np.array([12.5, 137.5, 12.5, 62.5])).all()
