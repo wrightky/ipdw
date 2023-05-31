@@ -9,7 +9,7 @@ setup(
     license = 'MIT',
     description = 'Inverse-Path-Distance-Weighted Interpolation for Python',
     long_description=LONG_DESCRIPTION,
-    long_description_content_type = text/markdown,
+    long_description_content_type = 'text/markdown',
     author = 'Kyle Wright',
     author_email = 'Kyle.Wright@twdb.texas.gov',
     url = 'https://github.com/wrightky/ipdw',
