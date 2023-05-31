@@ -7,29 +7,99 @@ class Gridded():
     """
     Class for handling interpolation workflow
     """
-    def __init__(self, cellsize, boundary, holes=None):
+    def __init__(self,
+                 cellsize=None,
+                 boundary=None,
+                 holes=None,
+                 raster=None,
+                 extent=None
+                 ):
         """
-        Instantiate a gridded object. This will read the target cellsize,
-        domain boundary, and any internal holes in the domain, and create
-        a target raster used as a basemap for later interpolation. The
-        basemap is stored in the Gridded.raster attribute.
+        Instantiate a gridded object using domain geometry information.
+        Optional input combinations are EITHER (cellsize, boundary, holes)
+        OR (raster, extent). ONE of these combinations is required, and
+        any inputs in the other combination will be ignored. 
+        
+        Creates the basemap used for interpolation, which is stored in the
+        Gridded.raster attribute.
         
         **Inputs**
-            cellsize (int or float) : Cellsize of target raster. Smaller
+            cellsize (float, optional) : Cellsize of target raster. Smaller
                 values will result in a higher-resolution grid and require
-                more computational time
-            boundary (list or array) : Coordinates of the domain boundary
-                in the same length-scale units as "cellsize". Coordinates
-                should be specified as [[x1,y1],[x2,y2],...] pairs in either
-                a list or array. Array dimensions should be (N,2).
-            holes (list of lists or arrays) : Coordinates of internal "holes"
-                in the domain, specified as a list of holes. Each hole should
-                be specified in the same format as the "boundary" input (i.e.
-                either a list or array of x,y coordinates).
+                more computational time. Must be specified in combination
+                with 'boundary'.
+            boundary (list or array, optional) : Coordinates of the domain
+                boundary in the same length-scale units as "cellsize".
+                Coordinates should be specified as [[x1,y1],[x2,y2],...] pairs
+                in either a list or array. Array dimensions should be (N,2).
+                Must be specified in combination with 'cellsize'.
+            holes (list of lists or arrays, optional) : Coordinates of 
+                internal "holes" in the domain, specified as a list of holes.
+                Each hole should be specified in the same format as the
+                'boundary' input (i.e. either a list or array of x,y
+                coordinates). Input is optional, but will only be used if
+                'cellsize' and 'boundary' are also specified.
+            raster (array, optional) : Binary array used as a basemap for
+                interpolation, with 1's in cells that should be filled during
+                interpolation, and 0's in cells that should be ignored.
+                Distances will be computed within continuous clusters of cells
+                in which the value =1. Must be specified in combination with
+                'extent', and will be ignored if 'cellsize' and 'boundary'
+                are both specified.
+            extent (list or array, optional) : (x,y) extent of input raster,
+                specified in the order [xmin, xmax, ymin, ymax]. Assumed to be
+                the footprint of the raster, not the cell centroid coordinates
+                of the boundary cells. If using rasterio, can be accessed
+                through the 'bounds' attribute of rasterio.io.DatasetReader.
+                Must be specified in combination with 'raster', and will be
+                ignored if 'cellsize' and 'boundary' are both specified.
         **Outputs**
             After initialization, the Gridded.raster attribute will contain a
-            binary basemap for later interpolation, with 1's everywhere inside
-            the domain, and 0's elsewhere.
+            binary basemap for later interpolation, with 1's in cells to be
+            filled by interpolation, and 0's elsewhere. Also saves the
+            attributes .cellsize, .extent, .bbox (similar to extent, but
+            contains boundary cell centroid coordinates).
+        """
+        if cellsize is not None and boundary is not None:
+            # Call _build_raster function to build basemap:
+            self._build_raster(cellsize, boundary, holes)
+        elif raster is not None and extent is not None:
+            # Call _from_raster to compute model geometry:
+            self._from_raster(raster, extent)
+        else:
+            raise ValueError("Incorrect inputs specified.\nRequires combination "+\
+                "of either cellsize AND boundary or raster AND extent")
+        
+    
+    def _build_raster(self, cellsize, boundary, holes):
+        """
+        Helper function creates a target raster taking into account domain
+        topology. Function is called during Gridded object initialization
+        if 'cellsize' and 'boundary' are both specified.
+        
+        In order to build the target raster, this function relies heavily on
+        matplotlib.path.Path() to make use of the domain boundary and hole
+        information. The speed of this function is therefore primarily limited
+        by the computational time needed to build each Path object and query
+        each raster point.
+        
+        **Inputs**
+            cellsize (float) : Cellsize of target raster. Smaller
+                values will result in a higher-resolution grid and require
+                more computational time.
+            boundary (list or array) : Coordinates of the domain
+                boundary in the same length-scale units as "cellsize".
+                Coordinates should be specified as [[x1,y1],[x2,y2],...] pairs
+                in either a list or array. Array dimensions should be (N,2).
+            holes (list of lists or arrays) : Coordinates of 
+                internal "holes" in the domain, specified as a list of holes.
+                Each hole should be specified in the same format as the
+                'boundary' input (i.e. either a list or array of x,y
+                coordinates).
+        **Outputs**
+            After running, the Gridded.raster attribute will contain a
+            binary basemap for later interpolation, with 1's in cells to be
+            filled by interpolation, and 0's elsewhere.
         """
         # Store inputs as attributes for accessibility
         self.cellsize = float(cellsize)
@@ -44,27 +114,7 @@ class Gridded():
             if type(holes[0]) == list:
                 holes = [np.array(hole) for hole in holes]
         self.holes = holes
-        # Call _build_raster function to build basemap:
-        self._build_raster()
-    
-    def _build_raster(self):
-        """
-        Helper function creates a target raster taking into account domain
-        topology. Function is called during Gridded object initialization.
         
-        In order to build the target raster, this function relies heavily on
-        matplotlib.path.Path() to make use of the domain boundary and hole
-        information. The speed of this function is therefore primarily limited
-        by the computational time needed to build each Path object and query
-        each raster point.
-        
-        **Inputs**
-            None, but relies on attributes supplied during instantiation.
-        **Outputs**
-            After running, the Gridded.raster attribute will contain a binary
-            basemap for later interpolation, with 1's everywhere inside the
-            domain, and 0's elsewhere.
-        """
         # Construct the target x,y grid using the domain bbox and cellsize
         nx = int(np.ceil((self.bbox[1]-self.bbox[0])/self.cellsize)+1)
         xvect = np.linspace(self.bbox[0],
@@ -99,7 +149,54 @@ class Gridded():
             yvect[-1]+0.5*self.cellsize,
         ]
         return
-    
+
+    def _from_raster(self, raster, extent):
+        """
+        Helper function determines domain geometry from an input raster.
+        Function is called during Gridded object initialization if 'raster'
+        and 'extent' are both specified.
+        
+        **Inputs**
+            raster (array) : Binary array used as a basemap for
+                interpolation, with 1's in cells that should be filled during
+                interpolation, and 0's in cells that should be ignored.
+                Distances will be computed within continuous clusters of cells
+                in which the value =1.
+            extent (list or array) : (x,y) extent of input raster,
+                specified in the order [xmin, xmax, ymin, ymax]. Assumed to be
+                the footprint of the raster, not the cell centroid coordinates
+                of the boundary cells. If using rasterio, can be accessed
+                through the 'bounds' attribute of rasterio.io.DatasetReader.
+        **Outputs**
+            After running, the Gridded.raster attribute will contain a
+            binary basemap for later interpolation, with 1's in cells to be
+            filled by interpolation, and 0's elsewhere.
+        """
+        # Save into attributes for access
+        self.raster = raster.astype(int)
+        self.extent = extent
+        
+        # Check cellsize
+        cellsize_y = (extent[3] - extent[2])/raster.shape[0]
+        cellsize_x = (extent[1] - extent[0])/raster.shape[1]
+        # These need to be equal (within a certain tolerance)
+        if (cellsize_y - cellsize_x) > 1e-2:
+            raise ValueError(
+                "Raster cellsize must be equal in x and y dimensions.\n"+\
+                "Current sizes %s and %s are not equal." % (cellsize_x, 
+                                                            cellsize_y))
+        # If they are within tolerance, use mean cellsize
+        self.cellsize = (cellsize_x + cellsize_y)/2
+        
+        # Determine bbox from extent/cellsize
+        self.bbox = [
+            extent[0]+0.5*self.cellsize,
+            extent[1]-0.5*self.cellsize,
+            extent[2]+0.5*self.cellsize,
+            extent[3]-0.5*self.cellsize,
+        ]
+        return
+
     def interpolate(self, input_locations, input_values, n_nearest=3,
                     power=1, offsets=None, buffer=0, regularization=1e-8):
         """
