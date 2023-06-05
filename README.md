@@ -1,3 +1,6 @@
+[![PyPi](https://img.shields.io/pypi/v/ipdw)](https://pypi.org/project/ipdw/)
+[![Python Version](https://img.shields.io/pypi/pyversions/ipdw)](https://pypi.org/project/ipdw/)
+[![Downloads](https://img.shields.io/pypi/dm/ipdw)](https://pypi.org/project/ipdw)
 # Inverse Path-Distance Weighted Interpolation
 
 `ipdw` is a Python package for performing [inverse-distance-weighted interpolation](https://en.wikipedia.org/wiki/Inverse_distance_weighting) using **path distances** instead of Euclidean distances. In other words, interpolation weights account for domain geometry and obstacles, which is often preferred in geophysical contexts in which "in water" distances are often more relevant to the process at hand than Euclidean distances. For example, this package allows you to quickly and easily interpolate inside a water body, accounting for complex coastlines, islands, and other barriers.
