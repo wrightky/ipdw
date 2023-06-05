@@ -6,7 +6,7 @@ This package is inspired by [Stachelek & Madden (2015)](doi.org/10.1080/13658816
 
 ## Installation
 
-Install the latest stable release from PyPi with pip:
+Install the latest stable release from [PyPi](https://pypi.org/project/ipdw/) with pip:
 ```
 pip install ipdw
 ```
