@@ -75,7 +75,7 @@ Also, note that there exists another function, `Gridded.reinterpolate`, which ca
 A few example interpolation outputs using different parameter choices are shown below.
 
 <div class="nav3" style="width:800px;">
-    <img src="example.jpeg" alt="Example" width="100%"></a>
+    <img src="https://raw.githubusercontent.com/wrightky/ipdw/main/example.jpeg" alt="Image" width="100%"></a>
 </div>
 
 ## Contributing
