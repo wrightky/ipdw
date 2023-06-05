@@ -5,7 +5,7 @@ with open('README.md') as f:
 
 setup(
     name = 'ipdw',
-    version = '1.0.0',
+    version = '1.0.1',
     license = 'MIT',
     description = 'Inverse-Path-Distance-Weighted Interpolation for Python',
     long_description=LONG_DESCRIPTION,
