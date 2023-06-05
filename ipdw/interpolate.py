@@ -197,8 +197,16 @@ class Gridded():
         ]
         return
 
-    def interpolate(self, input_locations, input_values, n_nearest=3,
-                    power=1, offsets=None, buffer=0, regularization=1e-8):
+    def interpolate(self,
+                    input_locations,
+                    input_values,
+                    n_nearest=3,
+                    power=1,
+                    offsets=None,
+                    buffer=0,
+                    regularization=1e-8,
+                    allow_outside=False
+                    ):
         """
         Method performs inverse-path-distance-weighted interpolation from
         input data locations onto target raster, using the number of neighbor
@@ -242,6 +250,10 @@ class Gridded():
             regularization (float, default=1e-8) : Very small regularization
                 parameter used to avoid dividing by zero when computing
                 the inverse of distance.
+            allow_outside (bool, default=False) : If any "input_locations"
+                are not within the interpolation domain, this boolean flag
+                controls whether to raise an error or simply ignore that
+                location during interpolation.
         **Outputs**
             output (array) : Raster of interpolated values.
         """
@@ -284,9 +296,19 @@ class Gridded():
                 # Actually compute distances
                 dist = np.abs(skfmm.distance(phi)*self.cellsize) + offsets[n]
             except ValueError:
-                raise ValueError("One or more locations are not within the "+\
-                                 "enclosed boundary. Check locations or try "+\
-                                 "increasing the buffer size")
+                if not allow_outside:
+                    raise ValueError(
+                        "One or more locations are not within the "+\
+                        "interpolation domain. Check locations, try "+\
+                        "increasing the buffer, or set allow_outside=True"
+                    )
+                else:
+                    print(
+                        "Warning: Input location %s" % input_locations[n,:]+\
+                        " not found within interpolation domain. " +\
+                        "Skipping this location."
+                    )
+                    continue
             dist[mask] = np.nan # Mask out locations outside domain
             self.dist_from_each[:,:,n] = dist # Store result
 
