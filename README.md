@@ -1,3 +1,4 @@
+[![codecov](https://codecov.io/gh/wrightky/ipdw/branch/main/graph/badge.svg?token=KQTT88DN6E)](https://codecov.io/gh/wrightky/ipdw)
 [![PyPi](https://img.shields.io/pypi/v/ipdw)](https://pypi.org/project/ipdw/)
 [![Python Version](https://img.shields.io/pypi/pyversions/ipdw)](https://pypi.org/project/ipdw/)
 [![Downloads](https://img.shields.io/pypi/dm/ipdw)](https://pypi.org/project/ipdw)
